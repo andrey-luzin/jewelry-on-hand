@@ -5,7 +5,7 @@ const HomeScreen = () => {
     <main className="page-shell">
       <section className="hero-card">
         <div className="hero-grid">
-          <div>
+          <div className="hero-info">
             <p className="hero-kicker">AR Jewelry MVP</p>
             <h1 className="hero-title">Примерка кольца прямо на руке.</h1>
             <p className="hero-text">

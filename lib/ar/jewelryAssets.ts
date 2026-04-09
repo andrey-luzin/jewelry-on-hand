@@ -6,9 +6,9 @@ export const demoRingAsset: JewelryAsset = {
   id: "demo-ring",
   // modelUrl: "/models/demo-ring.glb",
   modelUrl: "/models/ring.glb",
-  modelScale: 1.9,
+  modelScale: 3.45,
   name: "Demo Ring",
   positionOffset: [0.85, 0, 0],
-  rotationOffset: [0.1, 0, 0],
+  rotationOffset: [-130, 0, 0],
   type: "ring"
 };
