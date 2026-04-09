@@ -64,6 +64,7 @@ class CameraSession {
     await this.waitForMetadata(videoElement);
     await this.resetTrackZoom();
     await videoElement.play();
+    await this.waitForVideoDimensions(videoElement);
   };
 
   public stop = (): void => {
@@ -105,6 +106,37 @@ class CameraSession {
       videoElement.addEventListener("error", handleError, {
         once: true
       });
+    });
+  };
+
+  private waitForVideoDimensions = async (
+    videoElement: HTMLVideoElement
+  ): Promise<void> => {
+    if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      let attemptCount = 0;
+      const maxAttemptCount = 60;
+
+      const verifyDimensions = () => {
+        if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
+          resolve();
+          return;
+        }
+
+        attemptCount += 1;
+
+        if (attemptCount >= maxAttemptCount) {
+          reject(new Error("Не удалось получить размеры видеопотока."));
+          return;
+        }
+
+        window.requestAnimationFrame(verifyDimensions);
+      };
+
+      verifyDimensions();
     });
   };
 

@@ -8,6 +8,7 @@ import { HandTrackingEngine } from "@/lib/ar/handTrackingEngine";
 import { JewelryRenderer } from "@/lib/ar/jewelryRenderer";
 import { hiddenPose, RingPoseSolver } from "@/lib/ar/poseSolver";
 import type { AssetRenderMode } from "@/lib/ar/types";
+import { isMobileViewport } from "@/lib/ui/breakpoints";
 
 export type TryOnExperiencePhase =
   | "camera-denied"
@@ -59,6 +60,13 @@ const useTryOnExperience = () => {
   const [mediaFrameSize, setMediaFrameSize] = useState<MediaFrameSize>(
     getInitialMediaFrameSize
   );
+  const [isMobileLayout, setIsMobileLayout] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+
+    return isMobileViewport(window.innerWidth);
+  });
   const [retryToken, setRetryToken] = useState(0);
 
   const handleRetryRequest = () => {
@@ -79,6 +87,7 @@ const useTryOnExperience = () => {
     let jewelryRenderer: JewelryRenderer | null = null;
     let ringPoseSolver: RingPoseSolver | null = null;
     let currentHandVisibility = false;
+    let visualViewportResizeHandler: (() => void) | null = null;
 
     const updateExperienceState = (
       statePatch: Partial<TryOnExperienceState>
@@ -117,7 +126,26 @@ const useTryOnExperience = () => {
     };
 
     const handleViewportResize = () => {
-      const nextMediaFrameSize = resolveMediaFrameSize(videoElement);
+      const viewportWidth = Math.round(
+        window.visualViewport?.width ?? window.innerWidth
+      );
+      const viewportHeight = Math.round(
+        window.visualViewport?.height ?? window.innerHeight
+      );
+      const nextIsMobileLayout = isMobileViewport(viewportWidth);
+      const nextMediaFrameSize = resolveMediaFrameSize(
+        videoElement,
+        nextIsMobileLayout,
+        viewportWidth,
+        viewportHeight
+      );
+      setIsMobileLayout((currentIsMobileLayout) => {
+        if (currentIsMobileLayout === nextIsMobileLayout) {
+          return currentIsMobileLayout;
+        }
+
+        return nextIsMobileLayout;
+      });
       setMediaFrameSize((currentFrameSize) => {
         if (
           currentFrameSize.width === nextMediaFrameSize.width &&
@@ -137,6 +165,52 @@ const useTryOnExperience = () => {
         nextMediaFrameSize.width,
         nextMediaFrameSize.height
       );
+    };
+
+    const handleDeferredViewportResize = () => {
+      window.requestAnimationFrame(() => {
+        handleViewportResize();
+      });
+    };
+
+    const syncDesktopMediaFrame = () => {
+      handleViewportResize();
+
+      window.requestAnimationFrame(() => {
+        handleViewportResize();
+      });
+    };
+
+    const bindViewportListeners = () => {
+      window.addEventListener("orientationchange", handleDeferredViewportResize);
+      window.addEventListener("resize", handleDeferredViewportResize);
+
+      if (window.visualViewport) {
+        visualViewportResizeHandler = () => {
+          handleDeferredViewportResize();
+        };
+        window.visualViewport.addEventListener(
+          "resize",
+          visualViewportResizeHandler
+        );
+      }
+    };
+
+    const unbindViewportListeners = () => {
+      window.removeEventListener(
+        "orientationchange",
+        handleDeferredViewportResize
+      );
+      window.removeEventListener("resize", handleDeferredViewportResize);
+
+      if (window.visualViewport && visualViewportResizeHandler) {
+        window.visualViewport.removeEventListener(
+          "resize",
+          visualViewportResizeHandler
+        );
+      }
+
+      visualViewportResizeHandler = null;
     };
 
     const renderFrame = () => {
@@ -184,14 +258,13 @@ const useTryOnExperience = () => {
 
       try {
         jewelryRenderer = new JewelryRenderer(canvasElement);
+        bindViewportListeners();
         handleViewportResize();
-        window.addEventListener("orientationchange", handleViewportResize);
-        window.addEventListener("resize", handleViewportResize);
 
         const assetMode = await jewelryRenderer.loadAsset(demoRingAsset);
         cameraSession = new CameraSession();
         await cameraSession.start(videoElement);
-        handleViewportResize();
+        syncDesktopMediaFrame();
         handTrackingEngine = new HandTrackingEngine();
         await handTrackingEngine.initialize();
         ringPoseSolver = new RingPoseSolver();
@@ -218,8 +291,7 @@ const useTryOnExperience = () => {
     return () => {
       isDisposed = true;
       stopAnimationLoop();
-      window.removeEventListener("orientationchange", handleViewportResize);
-      window.removeEventListener("resize", handleViewportResize);
+      unbindViewportListeners();
       handTrackingEngine?.dispose();
       cameraSession?.stop();
       jewelryRenderer?.dispose();
@@ -230,42 +302,54 @@ const useTryOnExperience = () => {
     canvasRef,
     experienceState,
     handleRetryRequest,
-    mediaFrameStyle: {
-      height: `${mediaFrameSize.height}px`,
-      width: `${mediaFrameSize.width}px`
-    } satisfies CSSProperties,
+    isMobileLayout,
+    mediaFrameStyle:
+      isMobileLayout
+        ? undefined
+        : ({
+            height: `${mediaFrameSize.height}px`,
+            width: `${mediaFrameSize.width}px`
+          } satisfies CSSProperties),
     videoRef
   };
 };
 
 const resolveMediaFrameSize = (
-  videoElement: HTMLVideoElement
+  videoElement: HTMLVideoElement,
+  isMobileLayout: boolean,
+  viewportWidth: number,
+  viewportHeight: number
 ): MediaFrameSize => {
-  const availableWidth = window.innerWidth;
-  const availableHeight = window.innerHeight;
+  if (isMobileLayout) {
+    return {
+      height: viewportHeight,
+      width: viewportWidth
+    };
+  }
+
   const videoWidth = videoElement.videoWidth;
   const videoHeight = videoElement.videoHeight;
 
   if (!videoWidth || !videoHeight) {
     return {
-      height: availableHeight,
-      width: availableWidth
+      height: viewportHeight,
+      width: viewportWidth
     };
   }
 
   const videoAspectRatio = videoWidth / videoHeight;
-  const viewportAspectRatio = availableWidth / availableHeight;
+  const viewportAspectRatio = viewportWidth / viewportHeight;
 
   if (videoAspectRatio > viewportAspectRatio) {
     return {
-      height: Math.round(availableWidth / videoAspectRatio),
-      width: availableWidth
+      height: Math.round(viewportWidth / videoAspectRatio),
+      width: viewportWidth
     };
   }
 
   return {
-    height: availableHeight,
-    width: Math.round(availableHeight * videoAspectRatio)
+    height: viewportHeight,
+    width: Math.round(viewportHeight * videoAspectRatio)
   };
 };
 

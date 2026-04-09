@@ -8,6 +8,7 @@ const TryOnExperience = () => {
     canvasRef,
     experienceState,
     handleRetryRequest,
+    isMobileLayout,
     mediaFrameStyle,
     videoRef
   } = useTryOnExperience();
@@ -15,7 +16,10 @@ const TryOnExperience = () => {
   return (
     <main className="try-on-page">
       <section className="try-on-stage">
-        <div className="try-on__media-frame" style={mediaFrameStyle}>
+        <div
+          className="try-on__media-frame"
+          style={!isMobileLayout ? mediaFrameStyle : undefined}
+        >
           <video
             ref={videoRef}
             className="try-on__video"

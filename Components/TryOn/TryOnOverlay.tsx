@@ -1,3 +1,4 @@
+import cn from "classnames";
 import Link from "next/link";
 import { PrimaryLink } from "@/Components/UI/PrimaryLink";
 import { StatusPill } from "@/Components/UI/StatusPill";
@@ -103,6 +104,8 @@ const TryOnOverlay = ({
   onRetryRequest
 }: TryOnOverlayProps) => {
   const overlayContent = resolveOverlayContent(experienceState);
+  const isCompactPanel =
+    experienceState.phase === "initializing" || experienceState.phase === "ready";
 
   const handleRetryButtonClick = () => {
     onRetryRequest();
@@ -118,7 +121,9 @@ const TryOnOverlay = ({
           На главную
         </PrimaryLink>
       </div>
-      <div className="try-on__panel">
+      <div className={cn("try-on__panel", {
+        "try-on__panel--compact": isCompactPanel
+      })}>
         <div className="try-on__panel-header">
           <StatusPill tone={overlayContent.statusTone}>
             {overlayContent.statusLabel}
@@ -164,7 +169,7 @@ const TryOnOverlay = ({
             </button>
           ) : null}
           <Link
-            className="button-link button-link--ghost"
+            className="button-link button-link--ghost try-on__docs-link"
             href="https://developers.google.com/mediapipe/solutions/vision/hand_landmarker"
             rel="noreferrer"
             target="_blank"
