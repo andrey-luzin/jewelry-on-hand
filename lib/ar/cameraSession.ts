@@ -25,12 +25,12 @@ class CameraSession {
           ideal: 30,
           max: 60
         },
-        height: {
-          ideal: 1280
-        },
-        width: {
-          ideal: 720
-        }
+        // height: {
+        //   ideal: 1280
+        // },
+        // width: {
+        //   ideal: 720
+        // }
       }
     };
 
